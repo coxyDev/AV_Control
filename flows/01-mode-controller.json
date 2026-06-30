@@ -1,0 +1,78 @@
+[
+    {
+        "id": "mc-tab",
+        "type": "tab",
+        "label": "Mode Controller",
+        "disabled": false,
+        "info": "Ported from Mode_Controller.txt (Q-SYS Lua). setMode: msg.payload = { mode: 'classroom' | 'assembly' | 'production' }. powerButtonPressed: no payload required."
+    },
+    {
+        "id": "mc-lin-mode",
+        "type": "link in",
+        "z": "mc-tab",
+        "name": "setMode",
+        "links": [],
+        "x": 100,
+        "y": 100,
+        "wires": [["mc-fn-mode"]]
+    },
+    {
+        "id": "mc-fn-mode",
+        "type": "function",
+        "z": "mc-tab",
+        "name": "setMode",
+        "func": "// Ported from Mode_Controller.txt — layer visibility + AudioMute side effects\n// modeState.currentMode drives Dashboard UI conditional visibility bindings.\n// Audio mute state mirrors AudioMute.Boolean assignments in the original Lua.\nconst projector = global.get('projector');\nconst devices = global.get('devices');\nconst modeState = global.get('modeState');\n\nconst modeName = msg.payload.mode;  // 'classroom' | 'assembly' | 'production'\nconst rearIp = devices.projectors.rear.ip;\n\n(async () => {\n    try {\n        console.log(`[setMode] Switching to mode: ${modeName}`);\n        modeState.currentMode = modeName;\n\n        if (modeName === 'classroom') {\n            // AudioMute.Boolean = false in original — rear projector audio un-muted\n            console.log('[setMode] classroom: un-muting rear projector audio');\n            await projector.setAudioMute(rearIp, false);\n        } else if (modeName === 'assembly') {\n            // AudioMute.Boolean = true in original\n            console.log('[setMode] assembly: muting rear projector audio');\n            await projector.setAudioMute(rearIp, true);\n        } else if (modeName === 'production') {\n            // AudioMute.Boolean = true in original\n            console.log('[setMode] production: muting rear projector audio');\n            await projector.setAudioMute(rearIp, true);\n        } else {\n            node.warn(`[setMode] Unknown mode: \"${modeName}\"`);\n        }\n\n        console.log(`[setMode] Mode is now: ${modeName}`);\n        msg.payload = { success: true, mode: modeName };\n        node.send(msg);\n    } catch (err) {\n        node.error('[setMode] ' + err.message, msg);\n    }\n})();\n\nreturn null;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 340,
+        "y": 100,
+        "wires": [["mc-dbg"]]
+    },
+    {
+        "id": "mc-lin-pwr",
+        "type": "link in",
+        "z": "mc-tab",
+        "name": "powerButtonPressed",
+        "links": [],
+        "x": 100,
+        "y": 240,
+        "wires": [["mc-fn-pwr"]]
+    },
+    {
+        "id": "mc-fn-pwr",
+        "type": "function",
+        "z": "mc-tab",
+        "name": "powerButtonPressed",
+        "func": "// Ported from Mode_Controller.txt — PowerButton / full shutdown sequence\n//\n// The 3-second delay (matching Timer.CallAfter(3, ...) in original Q-SYS Lua)\n// gives projectors time to begin their shutdown sequence before the UI\n// visually returns to the welcome/startup screen. Do not remove.\nconst projector = global.get('projector');\nconst devices = global.get('devices');\nconst modeState = global.get('modeState');\n\nconst { left, right, rear } = devices.projectors;\n\n(async () => {\n    try {\n        console.log('[powerButtonPressed] Powering off all projectors (mirrors powerAllOff)');\n        // All three fire concurrently — same behaviour as powerAllOff in flow 03\n        await Promise.all([\n            projector.powerOff(left.ip).then(() => { modeState.projectorPower.left = false; }),\n            projector.powerOff(right.ip).then(() => { modeState.projectorPower.right = false; }),\n            projector.powerOff(rear.ip).then(() => { modeState.projectorPower.rear = false; }),\n        ]);\n\n        console.log('[powerButtonPressed] Projectors shutting down — waiting 3s before clearing mode');\n        await new Promise(resolve => setTimeout(resolve, 3000));\n\n        modeState.currentMode = null;\n        console.log('[powerButtonPressed] Mode cleared — UI returning to welcome state');\n        msg.payload = { success: true };\n        node.send(msg);\n    } catch (err) {\n        node.error('[powerButtonPressed] ' + err.message, msg);\n    }\n})();\n\nreturn null;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 340,
+        "y": 240,
+        "wires": [["mc-dbg"]]
+    },
+    {
+        "id": "mc-dbg",
+        "type": "debug",
+        "z": "mc-tab",
+        "name": "Mode Controller Debug",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 590,
+        "y": 170,
+        "wires": []
+    }
+]

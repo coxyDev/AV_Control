@@ -7,10 +7,7 @@
     "dev": "node-red -s settings.js --safe"
   },
   "dependencies": {
-    "node-red": "^3.1.x",
-    "node-red-contrib-tcp-client": "^1.0.0",
-    "node-red-contrib-crestron": "^1.0.0",
-    "node-red-node-serialport": "^2.0.0"
+    "node-red": "^3.1.x"
   },
   "engines": {
     "node": ">=18"
